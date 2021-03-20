@@ -1,0 +1,61 @@
+- hosts: tag_server_webserver
+  
+  vars:
+
+    - path_to_webpages: "./webpages"
+
+  tasks:
+    - name: "Install Apache web server"
+      package:
+        name: "httpd"
+        state: "present"
+    
+    - name: "Copy template webpages"
+      template:
+        src: "{{ item }}"
+        dest: "/var/www/html/{{  item.split('/')[-1].split('.')[:-1] | join('.') }}"
+      when: item.split('.')[-1] == "j2"
+      with_fileglob: "{{ path_to_webpages }}/*"
+
+    - name: "Copy webpages"
+      copy:
+        src: "{{ item }}"
+        dest: "/var/www/html/"
+      when: item.split('.')[-1] != "j2"
+      with_fileglob: "{{ path_to_webpages }}/*"
+
+
+    - name: "Start Apache web server"
+      service:
+        name: "httpd"
+        state: "started"
+
+- hosts: tag_server_haproxy
+
+  vars:
+    - cfg_file: "./config_files/haproxy_cfg.j2"
+    - haproxy_port: 5000
+  tasks:
+
+    - name: "Install HAProxy"
+      package:
+        name: "haproxy"
+        state: "present"
+    
+    - name: "Copy configuration files"
+      template:
+        src: "{{ cfg_file }}"
+        dest: "/etc/haproxy/haproxy.cfg"
+      notify: "Restart haproxy server"
+
+    - name: "Start Haproxy service"
+      service:
+        name: "haproxy"
+        state: "started"
+
+  handlers:
+
+    - name: "Restart haproxy server"
+      service:
+        name: "haproxy"
+        state: "restarted"
